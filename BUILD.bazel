@@ -1,0 +1,77 @@
+package(default_visibility = ["//visibility:public"])
+
+load("@buildifier_prebuilt//:rules.bzl", "buildifier")
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+# bazel run //:buildifier
+# .. or warn
+buildifier(
+    name = "buildifier",
+    exclude_patterns = [
+        "./bazel-*/*",
+        "./.git/*",
+    ],
+    lint_mode = "fix",
+)
+
+# "-DWITH_FFMPEG=OFF" is for https://github.com/opencv/opencv/issues/22748
+cmake(
+    name = "opencv",
+    cache_entries = {
+        "BUILD_LIST": "core,features2d,highgui,imgcodecs,imgproc,ml",
+        "WITH_FFMPEG": "OFF",
+        "WITH_GTK": "ON",  # Add this line to enable GTK support
+    },
+    lib_source = "@opencv//:all",
+    out_include_dir = "include/opencv4",
+    out_shared_libs = [
+        "libopencv_core.so.408",
+        "libopencv_features2d.so.408",
+        "libopencv_highgui.so.408",
+        "libopencv_imgcodecs.so.408",
+        "libopencv_imgproc.so.408",
+        "libopencv_ml.so.408",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "cell_detection",
+    srcs = ["cell_detection.cc"],
+    hdrs = ["cell_detection.h"],
+    deps = ["//:opencv"],
+)
+
+cc_test(
+    name = "cell_detection_test",
+    srcs = ["cell_detection_test.cc"],
+    data = ["//:testdata"],
+    deps = [
+        ":cell_detection",
+        "//:opencv",
+        "@absl//absl/strings",
+        "@bazel_tools//tools/cpp/runfiles",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "digit_detector",
+    srcs = ["digit_detector.cc"],
+    hdrs = ["digit_detector.h"],
+    deps = ["//:opencv",
+            "@glog",
+            "@absl//absl/types:optional",
+            "@absl//absl/strings"],
+)
+
+cc_test(
+    name = "digit_detector_test",
+    srcs = ["digit_detector_test.cc"],
+    data = [
+        "model.yml",
+        "//:testdata",
+    ],
+    deps = [":digit_detector", "@googletest//:gtest_main",
+            "//:opencv", "@bazel_tools//tools/cpp/runfiles"],
+)

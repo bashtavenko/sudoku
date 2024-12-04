@@ -1,0 +1,35 @@
+#ifndef SUDOKU__DIGIT_DETECTOR_H_
+#define SUDOKU__DIGIT_DETECTOR_H_
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+#include "opencv2/core.hpp"
+#include "opencv2/ml.hpp"
+
+namespace sudoku {
+
+// Detects Sudoku digits
+class DigitDetector {
+ public:
+  // Loads saved model. In any errors crashes binary with CHECK.
+  void Init(absl::string_view model_path);
+
+  // Detects image. Returns std::nullopt if image could not be recognized.
+  absl::optional<int32_t> Detect(const cv::Mat& image);
+
+  // Uses StatModel::train for training. May throw an exceptions from OpenCV.
+  // Otherwise, returns true.
+  bool Train(absl::string_view mnist_directory, absl::string_view model_path);
+
+  template <typename T>
+  cv::Ptr<T> GetModelAs() {
+    return model_.dynamicCast<T>();
+  }
+
+ private:
+  cv::Ptr<cv::ml::StatModel> model_;
+};
+
+
+} // namespace sudoku
+
+#endif  // SUDOKU__DIGIT_DETECTOR_H_

@@ -1,0 +1,11 @@
+cc_binary(
+    name = "train_main",
+    srcs = ["train_main.cc"],
+    deps = [
+        "//:digit_detector",
+        "@absl//absl/flags:flag",
+        "@absl//absl/flags:parse",
+        "@gflags",
+        "@glog",
+    ],
+)

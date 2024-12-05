@@ -1,7 +1,7 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@buildifier_prebuilt//:rules.bzl", "buildifier")
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+package(default_visibility = ["//visibility:public"])
 
 # bazel run //:buildifier
 # .. or warn
@@ -20,7 +20,8 @@ cmake(
     cache_entries = {
         "BUILD_LIST": "core,features2d,highgui,imgcodecs,imgproc,ml",
         "WITH_FFMPEG": "OFF",
-        "WITH_GTK": "ON",  # Add this line to enable GTK support
+        "WITH_GTK": "OFF",
+        "WITH_QT": "ON",
     },
     lib_source = "@opencv//:all",
     out_include_dir = "include/opencv4",
@@ -59,10 +60,12 @@ cc_library(
     name = "digit_detector",
     srcs = ["digit_detector.cc"],
     hdrs = ["digit_detector.h"],
-    deps = ["//:opencv",
-            "@glog",
-            "@absl//absl/types:optional",
-            "@absl//absl/strings"],
+    deps = [
+        "//:opencv",
+        "@absl//absl/strings",
+        "@absl//absl/types:optional",
+        "@glog",
+    ],
 )
 
 cc_test(
@@ -72,6 +75,31 @@ cc_test(
         "model.yml",
         "//:testdata",
     ],
-    deps = [":digit_detector", "@googletest//:gtest_main",
-            "//:opencv", "@bazel_tools//tools/cpp/runfiles"],
+    deps = [
+        ":cell_detection",
+        ":digit_detector",
+        "//:opencv",
+        "@bazel_tools//tools/cpp/runfiles",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_binary(
+    name = "solver_main",
+    testonly = 1,
+    srcs = ["solver_main.cc"],
+    data = [
+        "model.yml",
+        "//testdata",
+    ],
+    deps = [
+        ":cell_detection",
+        ":digit_detector",
+        "//:opencv",
+        "//solver",
+        "@absl//absl/flags:flag",
+        "@absl//absl/flags:parse",
+        "@gflags",
+        "@glog",
+    ],
 )

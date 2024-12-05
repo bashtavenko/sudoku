@@ -14,14 +14,14 @@ class DigitDetector {
   void Init(absl::string_view model_path);
 
   // Detects image. Returns std::nullopt if image could not be recognized.
-  absl::optional<int32_t> Detect(const cv::Mat& image);
+  absl::optional<int32_t> Detect(const cv::Mat& image) const;
 
   // Uses StatModel::train for training. May throw an exceptions from OpenCV.
   // Otherwise, returns true.
   bool Train(absl::string_view mnist_directory, absl::string_view model_path);
 
   template <typename T>
-  cv::Ptr<T> GetModelAs() {
+  cv::Ptr<T> GetModelAs() const {
     return model_.dynamicCast<T>();
   }
 

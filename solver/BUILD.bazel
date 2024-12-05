@@ -1,0 +1,17 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "solver",
+    srcs = ["solver.cc"],
+    hdrs = ["solver.h"],
+    deps = ["@absl//absl/algorithm:container"],
+)
+
+cc_test(
+    name = "solver_test",
+    srcs = ["solver_test.cc"],
+    deps = [
+        ":solver",
+        "@googletest//:gtest_main",
+    ],
+)

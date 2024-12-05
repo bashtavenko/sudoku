@@ -10,7 +10,7 @@ void DigitDetector::Init(absl::string_view model_path) {
   CHECK(model_ != nullptr) << "Failed to load model from: " << model_path;
 }
 
-absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) {
+absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) const {
   if (image.empty()) return std::nullopt;
   if (!model_->isTrained()) {
     LOG(ERROR) << "Model is not trained";
@@ -109,12 +109,12 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
       images.push_back(img);
       label_list.push_back(digit);
 
-      // Augment the image with slight transformations
-      for (int i = 0; i < 3; ++i) {
-        cv::Mat augmented_img = augment_image(img);
-        images.push_back(augmented_img);
-        label_list.push_back(digit);
-      }
+//      // Augment the image with slight transformations
+//      for (int i = 0; i < 3; ++i) {
+//        cv::Mat augmented_img = augment_image(img);
+//        images.push_back(augmented_img);
+//        label_list.push_back(digit);
+//      }
     }
   }
 

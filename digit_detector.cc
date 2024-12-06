@@ -55,7 +55,6 @@ absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) const {
 
 bool DigitDetector::Train(absl::string_view mnist_directory,
                           absl::string_view model_path) {
-
   // Augment and return a clone of the original image.
   auto augment_image = [&](const cv::Mat& img) {
     cv::Mat augmented_image = img.clone();
@@ -70,10 +69,10 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
                    cv::BORDER_REFLECT);
 
     // Random translation (up to 2 pixels)
-    int tx =
-        std::rand() % 5 - 2;  // Random translation in x direction (-2 to 2 pixels)
-    int ty =
-        std::rand() % 5 - 2;  // Random translation in y direction (-2 to 2 pixels)
+    int tx = std::rand() % 5 -
+             2;  // Random translation in x direction (-2 to 2 pixels)
+    int ty = std::rand() % 5 -
+             2;  // Random translation in y direction (-2 to 2 pixels)
     cv::Mat translation_matrix = cv::Mat::eye(2, 3, CV_32F);
     translation_matrix.at<float>(0, 2) = tx;
     translation_matrix.at<float>(1, 2) = ty;
@@ -82,8 +81,9 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
                    cv::BORDER_REFLECT);
 
     // Random blurring (kernel size 3x3 or 5x5)
-    int blur_kernel_size =
-        (std::rand() % 2 == 0) ? 3 : 5;  // Randomly select 3x3 or 5x5 kernel size
+    int blur_kernel_size = (std::rand() % 2 == 0)
+                               ? 3
+                               : 5;  // Randomly select 3x3 or 5x5 kernel size
     cv::GaussianBlur(augmented_image, augmented_image,
                      cv::Size(blur_kernel_size, blur_kernel_size), 0);
 
@@ -109,12 +109,12 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
       images.push_back(img);
       label_list.push_back(digit);
 
-//      // Augment the image with slight transformations
-//      for (int i = 0; i < 3; ++i) {
-//        cv::Mat augmented_img = augment_image(img);
-//        images.push_back(augmented_img);
-//        label_list.push_back(digit);
-//      }
+      // Augment the image with slight transformations
+      for (int i = 0; i < 3; ++i) {
+        cv::Mat augmented_img = augment_image(img);
+        images.push_back(augmented_img);
+        label_list.push_back(digit);
+      }
     }
   }
 
@@ -125,23 +125,31 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
     label_list.push_back(0);
   }
 
-  // Create training data and labels as matrices
-  cv::Mat training_data(images.size(), 28 * 28, CV_32F);
+  // Flattened all images to a single row and normalize.
+  cv::Mat flattened_images(images.size(), 28 * 28, CV_32F);
   cv::Mat labels = cv::Mat(label_list).reshape(1, label_list.size());
 
   for (size_t i = 0; i < images.size(); ++i) {
-    cv::Mat flattened_image = images[i].reshape(1, 1);  // Flatten to single row
-    flattened_image.convertTo(training_data.row(static_cast<int>(i)), CV_32F,
-                              1.0 / 255.0);  // Normalize to [0, 1]
+    cv::Mat flattened_image = images[i].reshape(1, 1);
+    flattened_image.convertTo(flattened_images.row(static_cast<int>(i)), CV_32F,
+                              1.0 / 255.0);
   }
+  auto train_data =
+      cv::ml::TrainData::create(flattened_images, cv::ml::ROW_SAMPLE, labels);
+  train_data->setTrainTestSplitRatio(0.9, /*shuffle=*/true);
 
   // Train the model
   knn_model->setDefaultK(3);  // Looks for at most k training examples
-  if (!knn_model->train(training_data, cv::ml::ROW_SAMPLE, labels)) {
+  if (!knn_model->train(train_data)) {
     LOG(ERROR) << "Training failed";
   }
+
+  cv::Mat results;
+  LOG(INFO) << "Training result: "
+            << 100. - knn_model->calcError(train_data, /*test=*/true, results);
+
   model_ = knn_model;
   model_->save(std::string(model_path));
   return true;
 }
-} // namespace sudoku
+}  // namespace sudoku

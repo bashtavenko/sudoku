@@ -39,22 +39,15 @@ absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) const {
                             1.0 / 255.0);  // Ensure correct type
 
   // Predict the digit
-  auto knn_model = GetModelAs<cv::ml::KNearest>();
-  if (!knn_model) {
-    LOG(ERROR) << "Model is not KNearest instance";
-    return std::nullopt;
-  }
-
-  cv::Mat results;
-  float response = knn_model->findNearest(processed_image,
-                                          knn_model->getDefaultK(), results);
+  float response = model_->predict(processed_image);
   if (response < 0) return std::nullopt;
 
   return static_cast<int32_t>(response);
 }
 
 bool DigitDetector::Train(absl::string_view mnist_directory,
-                          absl::string_view model_path) {
+                          absl::string_view model_path,
+                          size_t synthetic_count) {
   // Augment and return a clone of the original image.
   auto augment_image = [&](const cv::Mat& img) {
     cv::Mat augmented_image = img.clone();
@@ -110,7 +103,7 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
       label_list.push_back(digit);
 
       // Augment the image with slight transformations
-      for (int i = 0; i < 3; ++i) {
+      for (size_t i = 0; i < synthetic_count; ++i) {
         cv::Mat augmented_img = augment_image(img);
         images.push_back(augmented_img);
         label_list.push_back(digit);
@@ -144,9 +137,9 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
     LOG(ERROR) << "Training failed";
   }
 
-  cv::Mat results;
   LOG(INFO) << "Training result: "
-            << 100. - knn_model->calcError(train_data, /*test=*/true, results);
+            << 100. - knn_model->calcError(train_data, /*test=*/true,
+                                           cv::noArray());
 
   model_ = knn_model;
   model_->save(std::string(model_path));

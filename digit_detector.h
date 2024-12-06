@@ -18,7 +18,8 @@ class DigitDetector {
 
   // Uses StatModel::train for training. May throw an exceptions from OpenCV.
   // Otherwise, returns true.
-  bool Train(absl::string_view mnist_directory, absl::string_view model_path);
+  bool Train(absl::string_view mnist_directory, absl::string_view model_path,
+             size_t synthetic_count);
 
   template <typename T>
   cv::Ptr<T> GetModelAs() const {
@@ -29,7 +30,6 @@ class DigitDetector {
   cv::Ptr<cv::ml::StatModel> model_;
 };
 
-
-} // namespace sudoku
+}  // namespace sudoku
 
 #endif  // SUDOKU__DIGIT_DETECTOR_H_

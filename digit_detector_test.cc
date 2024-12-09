@@ -13,7 +13,7 @@ using ::testing::NotNull;
 using ::testing::Optional;
 using ::testing::Eq;
 
-constexpr absl::string_view kModelPath = "_main/model.yml";
+constexpr absl::string_view kModelPath = "_main/small_model.yml";
 constexpr absl::string_view kTestDataPath = "_main/testdata";
 
 TEST(DigitDetector, Works) {

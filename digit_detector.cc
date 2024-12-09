@@ -7,7 +7,7 @@ namespace sudoku {
 
 void DigitDetector::Init(absl::string_view model_path) {
   model_ = cv::ml::KNearest::load(std::string(model_path));
-  CHECK(model_ != nullptr) << "Failed to load model from: " << model_path;
+  CHECK(model_->isTrained()) << "Model is not trained - " << model_path;
 }
 
 absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) const {
@@ -123,9 +123,9 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   cv::Mat labels = cv::Mat(label_list).reshape(1, label_list.size());
 
   for (size_t i = 0; i < images.size(); ++i) {
-    cv::Mat flattened_image = images[i].reshape(1, 1);
-    flattened_image.convertTo(flattened_images.row(static_cast<int>(i)), CV_32F,
-                              1.0 / 255.0);
+    cv::Mat row_vec = images[i].reshape(1, 1);
+    row_vec.convertTo(flattened_images.row(static_cast<int>(i)), CV_32F,
+                      1.0 / 255.0);
   }
   auto train_data =
       cv::ml::TrainData::create(flattened_images, cv::ml::ROW_SAMPLE, labels);
@@ -136,12 +136,11 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   if (!knn_model->train(train_data)) {
     LOG(ERROR) << "Training failed";
   }
-
-  LOG(INFO) << "Training result: "
-            << 100. - knn_model->calcError(train_data, /*test=*/true,
-                                           cv::noArray());
-
   model_ = knn_model;
+  LOG(INFO) << "Training result: "
+            << 100. -
+                   model_->calcError(train_data, /*test=*/true, cv::noArray());
+
   model_->save(std::string(model_path));
   return true;
 }

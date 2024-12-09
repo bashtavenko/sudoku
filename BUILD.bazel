@@ -73,6 +73,7 @@ cc_test(
     srcs = ["digit_detector_test.cc"],
     data = [
         "model.yml",
+        "small_model.yml",
         "//:testdata",
     ],
     deps = [

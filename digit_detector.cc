@@ -6,7 +6,7 @@
 namespace sudoku {
 
 void DigitDetector::Init(absl::string_view model_path) {
-  model_ = cv::ml::KNearest::load(std::string(model_path));
+  model_ = cv::ml::ANN_MLP::load(std::string(model_path));
   CHECK(model_->isTrained()) << "Model is not trained - " << model_path;
 }
 
@@ -38,11 +38,7 @@ absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) const {
   processed_image.convertTo(processed_image, CV_32F,
                             1.0 / 255.0);  // Ensure correct type
 
-  // Predict the digit
-  float response = model_->predict(processed_image);
-  if (response < 0) return std::nullopt;
-
-  return static_cast<int32_t>(response);
+  return model_->predict(processed_image, cv::noArray());
 }
 
 bool DigitDetector::Train(absl::string_view mnist_directory,
@@ -83,10 +79,27 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
     return augmented_image;
   };
 
-  auto knn_model = cv::ml::KNearest::create();
-  knn_model->setAlgorithmType(cv::ml::KNearest::Types::BRUTE_FORCE);
+  auto mlp_model = cv::ml::ANN_MLP::create();
   std::vector<cv::Mat> images;
   std::vector<int> label_list;
+
+  auto compute_accuracy = [&](const cv::Mat& predictions, const cv::Mat& ground_truth) {
+    int correct_predictions = 0;
+
+    for (int i = 0; i < predictions.rows; ++i) {
+      // Find index of max value in prediction
+      cv::Point max_loc;
+      double max_val;
+      cv::minMaxLoc(predictions.row(i), /*minVal=*/nullptr, &max_val, /*minLoc=*/nullptr, &max_loc);
+
+      // Check if the max probability matches the ground truth
+      if (ground_truth.at<float>(i, max_loc.x) == 1.0f) {
+        correct_predictions++;
+      }
+    }
+
+    return static_cast<float>(correct_predictions) / predictions.rows;
+  };
 
   // Ignore 0
   for (int digit = 1; digit <= 9; ++digit) {
@@ -121,26 +134,50 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   // Flattened all images to a single row and normalize.
   cv::Mat flattened_images(images.size(), 28 * 28, CV_32F);
   cv::Mat labels = cv::Mat(label_list).reshape(1, label_list.size());
-
   for (size_t i = 0; i < images.size(); ++i) {
     cv::Mat row_vec = images[i].reshape(1, 1);
     row_vec.convertTo(flattened_images.row(static_cast<int>(i)), CV_32F,
                       1.0 / 255.0);
   }
-  auto train_data =
-      cv::ml::TrainData::create(flattened_images, cv::ml::ROW_SAMPLE, labels);
-  train_data->setTrainTestSplitRatio(0.9, /*shuffle=*/true);
 
-  // Train the model
-  knn_model->setDefaultK(3);  // Looks for at most k training examples
-  if (!knn_model->train(train_data)) {
-    LOG(ERROR) << "Training failed";
+  // Define MLP architecture
+  cv::Mat layer_sizes(1, 4, CV_32S);
+  layer_sizes.at<int>(0, 0) = 784;   // Input layer
+  layer_sizes.at<int>(0, 1) = 512;   // Hidden layer 1
+  layer_sizes.at<int>(0, 2) = 256;    // Hidden layer 2
+  layer_sizes.at<int>(0, 3) = 10;    // Output layer
+  mlp_model->setLayerSizes(layer_sizes);
+  mlp_model->setActivationFunction(cv::ml::ANN_MLP::SIGMOID_SYM, 1.0, 1.0);
+  mlp_model->setTrainMethod(cv::ml::ANN_MLP::BACKPROP, 0.001);
+  mlp_model->setBackpropWeightScale(0.1);  // Learning rate
+  mlp_model->setBackpropMomentumScale(0.7);
+  mlp_model->setBackpropMomentumScale(0.5);
+
+  // Prepare training data
+  cv::Mat one_hot_labels = cv::Mat::zeros(labels.rows, 10, CV_32F); // 10 classes
+  for (int i = 0; i < labels.rows; ++i) {
+    int class_label = labels.at<int>(i, 0); // Get the class label
+    one_hot_labels.at<float>(i, class_label) = 1.0f; // Set the correct class
   }
-  model_ = knn_model;
-  LOG(INFO) << "Training result: "
-            << 100. -
-                   model_->calcError(train_data, /*test=*/true, cv::noArray());
 
+  auto train_data =
+      cv::ml::TrainData::create(flattened_images, cv::ml::ROW_SAMPLE, one_hot_labels);
+  train_data->setTrainTestSplitRatio(0.8, /*shuffle=*/true);
+
+  // Train MLP model
+  LOG(INFO) << "Starting training...";
+  mlp_model->train(train_data);
+
+  LOG(INFO) << "Compute accuracy...";
+  cv::Mat train_predictions;
+  cv::Mat val_predictions;
+  mlp_model->predict(train_data->getTrainSamples(), train_predictions);
+  mlp_model->predict(train_data->getTestSamples(), val_predictions);
+  float train_accuracy = compute_accuracy(train_predictions, train_data->getTrainResponses());
+  float val_accuracy = compute_accuracy(val_predictions, train_data->getTestResponses());
+  LOG(INFO) << "Training Accuracy: " << train_accuracy << " Validation Accuracy: " << val_accuracy;
+
+  model_ = mlp_model;
   model_->save(std::string(model_path));
   return true;
 }

@@ -36,7 +36,7 @@ absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) const {
   cv::Mat processed_image =
       resized_image.reshape(1, 1);  // Flatten to a row vector
   processed_image.convertTo(processed_image, CV_32F,
-                            1.0 / 255.0);  // Ensure correct type
+                            1.0 / 1.0);  // Ensure correct type
 
   return model_->predict(processed_image, cv::noArray());
 }
@@ -58,10 +58,10 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
                    cv::BORDER_REFLECT);
 
     // Random translation (up to 2 pixels)
-    int tx = std::rand() % 5 -
-             2;  // Random translation in x direction (-2 to 2 pixels)
-    int ty = std::rand() % 5 -
-             2;  // Random translation in y direction (-2 to 2 pixels)
+    int tx = std::rand() % 2 -
+             4;  // Random translation in x direction (-2 to 2 pixels)
+    int ty = std::rand() % 2 -
+             4;  // Random translation in y direction (-2 to 2 pixels)
     cv::Mat translation_matrix = cv::Mat::eye(2, 3, CV_32F);
     translation_matrix.at<float>(0, 2) = tx;
     translation_matrix.at<float>(1, 2) = ty;
@@ -82,24 +82,6 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   auto mlp_model = cv::ml::ANN_MLP::create();
   std::vector<cv::Mat> images;
   std::vector<int> label_list;
-
-  auto compute_accuracy = [&](const cv::Mat& predictions, const cv::Mat& ground_truth) {
-    int correct_predictions = 0;
-
-    for (int i = 0; i < predictions.rows; ++i) {
-      // Find index of max value in prediction
-      cv::Point max_loc;
-      double max_val;
-      cv::minMaxLoc(predictions.row(i), /*minVal=*/nullptr, &max_val, /*minLoc=*/nullptr, &max_loc);
-
-      // Check if the max probability matches the ground truth
-      if (ground_truth.at<float>(i, max_loc.x) == 1.0f) {
-        correct_predictions++;
-      }
-    }
-
-    return static_cast<float>(correct_predictions) / predictions.rows;
-  };
 
   // Ignore 0
   for (int digit = 1; digit <= 9; ++digit) {
@@ -125,8 +107,11 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   }
 
   // Add blank samples and label them as 0
-  for (int i = 0; i < 100; ++i) {
-    cv::Mat blank_image = cv::Mat::zeros(28, 28, CV_8U) * 255;  // All black
+  for (int i = 0; i < 7000; ++i) {
+    cv::Mat blank_image = cv::Mat::zeros(28, 28, CV_8U);
+    int x = rand() % 20;
+    int y = rand() % 20;
+    cv::rectangle(blank_image, cv::Point(x, y), cv::Point(x + 5, y + 5), 50, -1); // Gray square
     images.push_back(blank_image);
     label_list.push_back(0);
   }
@@ -142,26 +127,27 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
 
   // Define MLP architecture
   cv::Mat layer_sizes(1, 4, CV_32S);
-  layer_sizes.at<int>(0, 0) = 784;   // Input layer
-  layer_sizes.at<int>(0, 1) = 512;   // Hidden layer 1
-  layer_sizes.at<int>(0, 2) = 256;    // Hidden layer 2
-  layer_sizes.at<int>(0, 3) = 10;    // Output layer
+  layer_sizes.at<int>(0, 0) = 784;  // Input layer
+  layer_sizes.at<int>(0, 1) = 512;  // Hidden layer 1
+  layer_sizes.at<int>(0, 2) = 256;  // Hidden layer 2
+  layer_sizes.at<int>(0, 3) = 10;   // Output layer
   mlp_model->setLayerSizes(layer_sizes);
   mlp_model->setActivationFunction(cv::ml::ANN_MLP::SIGMOID_SYM, 1.0, 1.0);
   mlp_model->setTrainMethod(cv::ml::ANN_MLP::BACKPROP, 0.001);
-  mlp_model->setBackpropWeightScale(0.1);  // Learning rate
+  mlp_model->setBackpropWeightScale(0.001);  // Learning rate
   mlp_model->setBackpropMomentumScale(0.7);
   mlp_model->setBackpropMomentumScale(0.5);
 
   // Prepare training data
-  cv::Mat one_hot_labels = cv::Mat::zeros(labels.rows, 10, CV_32F); // 10 classes
+  cv::Mat one_hot_labels =
+      cv::Mat::zeros(labels.rows, 10, CV_32F);  // 10 classes
   for (int i = 0; i < labels.rows; ++i) {
-    int class_label = labels.at<int>(i, 0); // Get the class label
-    one_hot_labels.at<float>(i, class_label) = 1.0f; // Set the correct class
+    int class_label = labels.at<int>(i, 0);           // Get the class label
+    one_hot_labels.at<float>(i, class_label) = 1.0f;  // Set the correct class
   }
 
-  auto train_data =
-      cv::ml::TrainData::create(flattened_images, cv::ml::ROW_SAMPLE, one_hot_labels);
+  auto train_data = cv::ml::TrainData::create(
+      flattened_images, cv::ml::ROW_SAMPLE, one_hot_labels);
   train_data->setTrainTestSplitRatio(0.8, /*shuffle=*/true);
 
   // Train MLP model
@@ -169,13 +155,90 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   mlp_model->train(train_data);
 
   LOG(INFO) << "Compute accuracy...";
+  auto compute_accuracy = [&](const cv::Mat& predictions,
+                              const cv::Mat& ground_truth) {
+    int correct_predictions = 0;
+
+    for (int i = 0; i < predictions.rows; ++i) {
+      // Find index of max value in prediction
+      cv::Point max_loc;
+      double max_val;
+      cv::minMaxLoc(predictions.row(i), /*minVal=*/nullptr, &max_val,
+                    /*minLoc=*/nullptr, &max_loc);
+
+      // Check if the max probability matches the ground truth
+      if (ground_truth.at<float>(i, max_loc.x) == 1.0f) {
+        correct_predictions++;
+      }
+    }
+
+    return static_cast<float>(correct_predictions) / predictions.rows;
+  };
   cv::Mat train_predictions;
   cv::Mat val_predictions;
   mlp_model->predict(train_data->getTrainSamples(), train_predictions);
   mlp_model->predict(train_data->getTestSamples(), val_predictions);
-  float train_accuracy = compute_accuracy(train_predictions, train_data->getTrainResponses());
-  float val_accuracy = compute_accuracy(val_predictions, train_data->getTestResponses());
-  LOG(INFO) << "Training Accuracy: " << train_accuracy << " Validation Accuracy: " << val_accuracy;
+  float train_accuracy =
+      compute_accuracy(train_predictions, train_data->getTrainResponses());
+  float val_accuracy =
+      compute_accuracy(val_predictions, train_data->getTestResponses());
+  LOG(INFO) << "Training Accuracy: " << train_accuracy
+            << " Validation Accuracy: " << val_accuracy;
+
+  LOG(INFO) << "Confusion matrix...";
+  auto confusion_matrix = [&](const cv::Mat& predictions,
+                              const cv::Mat& ground_truth, int num_classes) {
+    cv::Mat confusion_matrix = cv::Mat::zeros(num_classes, num_classes, CV_32S);
+
+    for (int i = 0; i < predictions.rows; ++i) {
+      // Find the predicted class (max probability index)
+      cv::Point max_loc;
+      cv::minMaxLoc(predictions.row(i), /*minVal=*/nullptr, /*maxVal=*/nullptr, /*minLoc=*/nullptr, &max_loc);
+      int predicted_label = max_loc.x;
+
+      // Find the ground truth class (index of 1 in one-hot encoding)
+      cv::Point gt_loc;
+      cv::minMaxLoc(ground_truth.row(i), /*minVal=*/nullptr, /*maxVal=*/nullptr, /*minLoc=*/nullptr, &gt_loc);
+      int true_label = gt_loc.x;
+
+      // Update confusion matrix
+      confusion_matrix.at<int>(true_label, predicted_label)++;
+    }
+
+    return confusion_matrix;
+  };
+
+  auto compute_metrics =
+      [&](const cv::Mat& confusion_matrix) {
+        int num_classes = confusion_matrix.rows;
+        for (int i = 0; i < num_classes; ++i) {
+          int true_positive = confusion_matrix.at<int>(i, i);
+          int false_positive =
+              cv::sum(confusion_matrix.row(i))[0] - true_positive;
+          int false_negative =
+              cv::sum(confusion_matrix.col(i))[0] - true_positive;
+
+          float precision =
+              (true_positive + false_positive > 0)
+                  ? true_positive /
+                        static_cast<float>(true_positive + false_positive)
+                  : 0.0f;
+          float recall =
+              (true_positive + false_negative > 0)
+                  ? true_positive /
+                        static_cast<float>(true_positive + false_negative)
+                  : 0.0f;
+          float f1_score = (precision + recall > 0)
+                               ? 2 * precision * recall / (precision + recall)
+                               : 0.0f;
+
+          LOG(INFO) << "Class " << i;
+          LOG(INFO) << "  Precision: " << precision;
+          LOG(INFO) << "  Recall: " << recall;
+          LOG(INFO) << "  F1 Score: " << f1_score;
+        }
+      };
+  compute_metrics(confusion_matrix(train_predictions, train_data->getTrainResponses(), 10));
 
   model_ = mlp_model;
   model_->save(std::string(model_path));

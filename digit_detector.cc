@@ -129,17 +129,36 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   }
   auto train_data =
       cv::ml::TrainData::create(flattened_images, cv::ml::ROW_SAMPLE, labels);
-  train_data->setTrainTestSplitRatio(0.9, /*shuffle=*/true);
+  train_data->setTrainTestSplitRatio(0.8, /*shuffle=*/true);
 
-  // Train the model
+  LOG(INFO) << "Starting training...";
   knn_model->setDefaultK(3);  // Looks for at most k training examples
-  if (!knn_model->train(train_data)) {
-    LOG(ERROR) << "Training failed";
-  }
+  knn_model->train(train_data);
 
-  LOG(INFO) << "Training result: "
-            << 100. - knn_model->calcError(train_data, /*test=*/true,
-                                           cv::noArray());
+  LOG(INFO) << "Compute accuracy...";
+  auto compute_accuracy = [&](const cv::Mat& predictions,
+                              const cv::Mat& ground_truth) {
+    int correct_predictions = 0;
+
+    for (int i = 0; i < predictions.rows; ++i) {
+      // TODO: No idea.
+      LOG(INFO) << ground_truth.at<int32_t>(i, 0) << " : " << predictions.at<double>(i, 0);
+      if (ground_truth.at<int32_t>(i, 0) == predictions.at<int32_t>(i, 0)) {
+        correct_predictions++;
+      }
+    }
+    return static_cast<float>(correct_predictions) / predictions.rows;
+  };
+  cv::Mat train_predictions;
+  cv::Mat val_predictions;
+  knn_model->predict(train_data->getTrainSamples(), train_predictions);
+  knn_model->predict(train_data->getTestSamples(), val_predictions);
+  float train_accuracy =
+      compute_accuracy(train_predictions, train_data->getTrainResponses());
+  float val_accuracy =
+      compute_accuracy(val_predictions, train_data->getTestResponses());
+  LOG(INFO) << "Training Accuracy: " << train_accuracy
+            << " Validation Accuracy: " << val_accuracy;
 
   model_ = knn_model;
   model_->save(std::string(model_path));

@@ -135,15 +135,13 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   knn_model->setDefaultK(3);  // Looks for at most k training examples
   knn_model->train(train_data);
 
-  LOG(INFO) << "Compute accuracy...";
+  LOG(INFO) << "Computing accuracy...";
   auto compute_accuracy = [&](const cv::Mat& predictions,
                               const cv::Mat& ground_truth) {
     int correct_predictions = 0;
-
     for (int i = 0; i < predictions.rows; ++i) {
-      // TODO: No idea.
-      LOG(INFO) << ground_truth.at<int32_t>(i, 0) << " : " << predictions.at<double>(i, 0);
-      if (ground_truth.at<int32_t>(i, 0) == predictions.at<int32_t>(i, 0)) {
+      if (ground_truth.at<int32_t>(i, 0) ==
+          static_cast<int32_t>(predictions.at<float>(i, 0))) {
         correct_predictions++;
       }
     }
@@ -159,6 +157,49 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
       compute_accuracy(val_predictions, train_data->getTestResponses());
   LOG(INFO) << "Training Accuracy: " << train_accuracy
             << " Validation Accuracy: " << val_accuracy;
+
+  auto confusion_matrix = [&](const cv::Mat& predictions,
+                              const cv::Mat& ground_truth, int num_classes) {
+    cv::Mat confusion_matrix = cv::Mat::zeros(num_classes, num_classes, CV_32S);
+    for (size_t i = 0; i < predictions.rows; ++i) {
+      int32_t predicted_label =
+          static_cast<int32_t>(predictions.at<float>(i, 0));
+      int32_t true_label = ground_truth.at<int32_t>(i, 0);
+      confusion_matrix.at<int32_t>(true_label, predicted_label)++;
+    }
+    return confusion_matrix;
+  };
+  auto compute_metrics = [&](const cv::Mat& confusion_matrix) {
+    int32_t num_classes = confusion_matrix.rows;
+    int32_t true_positive = 0;
+    int32_t false_positive = 0;
+    int32_t false_negative = 0;
+    float precision = 0;
+    float recall = 0;
+    float f1_score = 0;
+    // Row = true labels; Col = prediction labels
+    for (int i = 0; i < num_classes; ++i) {
+      true_positive += confusion_matrix.at<int>(i, i);
+      false_positive += cv::sum(confusion_matrix.row(i))[0] - confusion_matrix.at<int>(i, i);
+      false_negative += cv::sum(confusion_matrix.col(i))[0] - confusion_matrix.at<int>(i, i);
+    }
+    precision +=
+        (true_positive + false_positive > 0)
+            ? true_positive / static_cast<float>(true_positive + false_positive)
+            : 0.0f;
+    recall =
+        (true_positive + false_negative > 0)
+            ? true_positive / static_cast<float>(true_positive + false_negative)
+            : 0.0f;
+    f1_score = (precision + recall > 0)
+                   ? 2 * precision * recall / (precision + recall)
+                   : 0.0f;
+    LOG(INFO) << "Precision: " << precision;
+    LOG(INFO) << "Recall: " << recall;
+    LOG(INFO) << "F1 Score: " << f1_score;
+  };
+  compute_metrics(
+      confusion_matrix(train_predictions, train_data->getTrainResponses(), 10));
 
   model_ = knn_model;
   model_->save(std::string(model_path));

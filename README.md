@@ -18,8 +18,8 @@ the solver outputs
 ## Overview
 
 1. Detects Sudoku grid and extracts 81 digit cells
-2. Detects each cell with simple ML model
-3. Solves through backtracking
+2. Detects each cell with a simple ML model
+3. Solves it through backtracking
 4. Puts answers into the same grid
 
 ## Dependencies

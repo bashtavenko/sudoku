@@ -24,7 +24,7 @@ absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) const {
     gray_image = image;
   }
 
-  // Invert the image - white digit on black background due to MNIST examples.
+  // Invert the image-white digit on a black background due to MNIST examples.
   cv::Mat inverted_image;
   cv::bitwise_not(gray_image, inverted_image);
 
@@ -36,7 +36,7 @@ absl::optional<int32_t> DigitDetector::Detect(const cv::Mat& image) const {
   cv::Mat processed_image =
       resized_image.reshape(1, 1);  // Flatten to a row vector
   processed_image.convertTo(processed_image, CV_32F,
-                            1.0 / 255.0);  // Ensure correct type
+                            1.0 / 255.0);  // Ensure the correct type
 
   // Predict the digit
   float response = model_->predict(processed_image);
@@ -149,6 +149,8 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   };
   cv::Mat train_predictions;
   cv::Mat val_predictions;
+  // auto data = train_data->getTrainSamples();
+  // auto test_samples = train_data->getTestSamples();
   knn_model->predict(train_data->getTrainSamples(), train_predictions);
   knn_model->predict(train_data->getTestSamples(), val_predictions);
   float train_accuracy =
@@ -161,7 +163,7 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   auto confusion_matrix = [&](const cv::Mat& predictions,
                               const cv::Mat& ground_truth, int num_classes) {
     cv::Mat confusion_matrix = cv::Mat::zeros(num_classes, num_classes, CV_32S);
-    for (size_t i = 0; i < predictions.rows; ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(predictions.rows); ++i) {
       int32_t predicted_label =
           static_cast<int32_t>(predictions.at<float>(i, 0));
       int32_t true_label = ground_truth.at<int32_t>(i, 0);

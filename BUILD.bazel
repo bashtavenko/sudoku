@@ -1,4 +1,5 @@
 load("@buildifier_prebuilt//:rules.bzl", "buildifier")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
 package(default_visibility = ["//visibility:public"])
@@ -14,26 +15,70 @@ buildifier(
     lint_mode = "fix",
 )
 
-# "-DWITH_FFMPEG=OFF" is for https://github.com/opencv/opencv/issues/22748
-cmake(
+cc_library(
+    name = "opencv_release",
+    srcs = select({
+        "@platforms//os:linux": glob(
+            ["third_party/opencv/lib/*.so*"],
+            allow_empty = True,
+        ),
+        "@platforms//os:macos": glob(
+            ["third_party/opencv/lib/*.dylib"],
+            allow_empty = True,
+        ),
+        "@platforms//os:windows": glob(
+            [
+                "third_party/opencv/release/x64/vc17/lib/*.lib",
+                "third_party/opencv/release/x64/vc17/bin/*.dll",
+            ],
+            allow_empty = True,
+        ),
+    }),
+    hdrs = glob(
+        ["third_party/opencv/include/**/*"],
+        allow_empty = True,
+    ),
+    includes = ["third_party/opencv/include"],
+)
+
+cc_library(
+    name = "opencv_debug",
+    srcs = select({
+        "@platforms//os:linux": glob(
+            ["third_party/opencv/lib_debug/*.so*"],
+            allow_empty = True,
+        ),
+        "@platforms//os:macos": glob(
+            ["third_party/opencv/lib_debug/*.dylib"],
+            allow_empty = True,
+        ),
+        "@platforms//os:windows": glob(
+            [
+                "third_party/opencv/debug/x64/vc17/lib/*.lib",
+                "third_party/opencv/debug/x64/vc17/bin/*.dll",
+            ],
+            allow_empty = True,
+        ),
+    }),
+    hdrs = glob(
+        ["third_party/opencv/include_debug/**/*"],
+        allow_empty = True,
+    ),
+    includes = ["third_party/opencv/include_debug"],
+)
+
+config_setting(
+    name = "debug_build",
+    values = {"compilation_mode": "dbg"},
+)
+
+cc_library(
     name = "opencv",
-    cache_entries = {
-        "BUILD_LIST": "core,features2d,highgui,imgcodecs,imgproc,ml",
-        "WITH_FFMPEG": "OFF",
-        "WITH_GTK": "OFF",
-        "WITH_QT": "ON",
-    },
-    lib_source = "@opencv//:all",
-    out_include_dir = "include/opencv4",
-    out_shared_libs = [
-        "libopencv_core.so.408",
-        "libopencv_features2d.so.408",
-        "libopencv_highgui.so.408",
-        "libopencv_imgcodecs.so.408",
-        "libopencv_imgproc.so.408",
-        "libopencv_ml.so.408",
-    ],
     visibility = ["//visibility:public"],
+    deps = select({
+        ":debug_build": [":opencv_release"],
+        "//conditions:default": [":opencv_release"],
+    }),
 )
 
 cc_library(

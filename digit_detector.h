@@ -13,10 +13,10 @@ class DigitDetector {
   // Loads saved model. In any errors crashes binary with CHECK.
   void Init(absl::string_view model_path);
 
-  // Detects image. Returns std::nullopt if image could not be recognized.
+  // Detects image. Returns `std::nullopt` if the image could not be recognized.
   absl::optional<int32_t> Detect(const cv::Mat& image) const;
 
-  // Uses StatModel::train for training. May throw an exceptions from OpenCV.
+  // Uses StatModel::train for training. May throw an exception from OpenCV.
   // Otherwise, returns true.
   bool Train(absl::string_view mnist_directory, absl::string_view model_path,
              size_t synthetic_count);

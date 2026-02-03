@@ -41,3 +41,7 @@ MODULE.bazel.lock
 
 # Model
 *.yml
+
+third_party
+
+venv

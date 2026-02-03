@@ -1,6 +1,5 @@
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 #include "absl/flags/flag.h"
+#include <glog/logging.h>
 #include "absl/flags/parse.h"
 #include "digit_detector.h"
 
@@ -11,12 +10,9 @@ ABSL_FLAG(std::size_t, synthetic_count, 3,
           "Number of synthetic training samples per digit");
 
 int main(int argc, char** argv) {
-  google::InitGoogleLogging(*argv);
-
+  google::InitGoogleLogging(argv[0]);
   absl::ParseCommandLine(argc, argv);
-
-  // Cannot parse both Abseil and gflags.
-  gflags::SetCommandLineOption("logtostderr", "1");
+  FLAGS_alsologtostderr = true;
 
   sudoku::DigitDetector detector;
   if (!detector.Train(absl::GetFlag(FLAGS_mnist_dir),

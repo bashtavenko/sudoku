@@ -3,8 +3,8 @@ Download and extract MNIST from Kaggle.
 
 This assumes:
 1. All requirements are satisfied according to requirements.txt
-2. Kaggle.json exists in ~/.kaggle/kaggle.json
-3. Directory is created, for example ~/mnist_data and passed to output_dir
+2. Kaggle.json exists in ~/config/kaggle/kaggle.json
+3. Directory is created, example ~/mnist_data and passed to output_dir
 """
 import os
 import numpy as np

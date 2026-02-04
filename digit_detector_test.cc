@@ -5,6 +5,7 @@
 #include "opencv2/opencv.hpp"
 #include "cell_detection.h"
 #include "tools/cpp/runfiles/runfiles.h"
+#include "tesseract_helpers.h"
 
 namespace sudoku {
 namespace {
@@ -40,16 +41,14 @@ TEST(DigitDetector, Works) {
   EXPECT_THAT(detector.Detect(get_image("digit-blank.png")), Optional(0));
 }
 
-// TODO: Requires more result matching
-TEST(DISABLED_E2ETest, Works) {
+TEST(E2ETest, Works) {
   auto files = Runfiles::CreateForTest();
   cv::Mat image = cv::imread(files->Rlocation(
       std::filesystem::path(kTestDataPath) / "sudoku_9_9.png"));
   ASSERT_FALSE(image.empty());
   std::vector<std::vector<SudokuDetection>> cells = DetectCells(image);
   std::vector result(9, std::vector(9, 0));
-  DigitDetector detector;
-  detector.Init(files->Rlocation(kModelPath.data()));
+  DigitDetectorTesseract detector = DigitDetectorTesseract::Create();
   for (size_t row = 0; row < 9; ++row) {
     for (size_t col = 0; col < 9; ++col) {
       auto digit = detector.Detect(cells[row][col].digit_image);
@@ -68,5 +67,29 @@ TEST(DISABLED_E2ETest, Works) {
                           {0, 0, 0, 4, 1, 9, 0, 0, 5},
                           {0, 0, 0, 0, 8, 0, 0, 7, 9}}));
 }
+
+TEST(DigitDetectorTesseract, Works) {
+  auto files = Runfiles::CreateForTest();
+
+  auto get_image = [&](absl::string_view image_name) {
+    cv::Mat image = cv::imread(
+        files->Rlocation(std::filesystem::path(kTestDataPath) / image_name));
+    return image;
+  };
+  ASSERT_FALSE(get_image("digit-1.png").empty());
+
+  DigitDetectorTesseract detector = DigitDetectorTesseract::Create();
+  EXPECT_THAT(detector.Detect(get_image("digit-1.png")), Optional(1));
+  EXPECT_THAT(detector.Detect(get_image("digit-2.png")), Optional(2));
+  EXPECT_THAT(detector.Detect(get_image("digit-3.png")), Optional(3));
+  EXPECT_THAT(detector.Detect(get_image("digit-4.png")), Optional(4));
+  EXPECT_THAT(detector.Detect(get_image("digit-5.png")), Optional(5));
+  EXPECT_THAT(detector.Detect(get_image("digit-6.png")), Optional(6));
+  EXPECT_THAT(detector.Detect(get_image("digit-7.png")), Optional(7));
+  EXPECT_THAT(detector.Detect(get_image("digit-8.png")), Optional(8));
+  EXPECT_THAT(detector.Detect(get_image("digit-9.png")), Optional(9));
+  EXPECT_THAT(detector.Detect(get_image("digit-blank.png")), Optional(0));
+}
+
 }  // namespace
 }  // namespace sudoku

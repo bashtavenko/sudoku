@@ -12,11 +12,10 @@
 #include "solver/solver.h"
 
 ABSL_FLAG(std::string, image_path, "/tmp/sudoku_9_9.png", "Sudoku image path");
-ABSL_FLAG(std::string, model_path, "/tmp/model.yml", "Model path");
 
 std::vector<std::vector<int32_t>> DetectDigitsFromCells(
     const std::vector<std::vector<sudoku::SudokuDetection>>& cells,
-    const sudoku::DigitDetector& detector) {
+    const sudoku::DigitDetectorTesseract& detector) {
   auto grid = std::vector<std::vector<int32_t>>(9, std::vector<int32_t>(9, 0));
   for (size_t row = 0; row < 9; ++row) {
     for (size_t col = 0; col < 9; ++col) {
@@ -63,15 +62,12 @@ void ShowAnswers(
 
 bool Run() {
   using sudoku::DetectCells;
-  using sudoku::DigitDetector;
+  using sudoku::DigitDetectorTesseract;
   using sudoku::Solve;
   using sudoku::SudokuDetection;
 
-  DigitDetector detector;
+  DigitDetectorTesseract detector = DigitDetectorTesseract::Create();
 
-  // Load model
-  LOG(INFO) << "Loading " << absl::GetFlag(FLAGS_model_path) << " ...";
-  detector.Init(absl::GetFlag(FLAGS_model_path));
   cv::Mat image = cv::imread(absl::GetFlag(FLAGS_image_path));
   CHECK(!image.empty()) << "Could not open " << absl::GetFlag(FLAGS_image_path);
 

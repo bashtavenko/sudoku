@@ -1,7 +1,8 @@
 #include "digit_detector.h"
 #include <filesystem>
-#include <opencv2/opencv.hpp>
+#include "absl/strings/numbers.h"
 #include "glog/logging.h"
+#include "opencv2/opencv.hpp"
 
 namespace sudoku {
 
@@ -182,8 +183,10 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
     // Row = true labels; Col = prediction labels
     for (int i = 0; i < num_classes; ++i) {
       true_positive += confusion_matrix.at<int>(i, i);
-      false_positive += cv::sum(confusion_matrix.row(i))[0] - confusion_matrix.at<int>(i, i);
-      false_negative += cv::sum(confusion_matrix.col(i))[0] - confusion_matrix.at<int>(i, i);
+      false_positive +=
+          cv::sum(confusion_matrix.row(i))[0] - confusion_matrix.at<int>(i, i);
+      false_negative +=
+          cv::sum(confusion_matrix.col(i))[0] - confusion_matrix.at<int>(i, i);
     }
     precision +=
         (true_positive + false_positive > 0)
@@ -207,4 +210,46 @@ bool DigitDetector::Train(absl::string_view mnist_directory,
   model_->save(std::string(model_path));
   return true;
 }
+
+DigitDetectorTesseract DigitDetectorTesseract::Create() {
+  Tesseract api(new tesseract::TessBaseAPI());
+  CHECK_EQ(0, api->Init(nullptr, "eng")) << "Failed to initialize Tesseract";
+  return DigitDetectorTesseract(Tesseract(std::move(api)));
+}
+
+DigitDetectorTesseract::DigitDetectorTesseract(Tesseract tesseract)
+    : tesseract_(std::move(tesseract)) {}
+
+absl::optional<int32_t> DigitDetectorTesseract::Detect(
+    const cv::Mat& image) const {
+  tesseract_->SetImage(image.data, image.cols, image.rows, image.channels(),
+                       image.step);
+  TesseractText text(tesseract_->GetUTF8Text());
+  CHECK(text != nullptr);
+
+  // Parse OCR for integer
+  const std::string raw_text = text.get();
+  if (raw_text.empty()) return 0;
+  const std::string stripped_text =
+      raw_text.substr(raw_text.find_first_not_of(('\n')));
+
+  std::string digits;
+  digits.reserve(stripped_text.size());
+  bool is_digit_run = false;
+  for (char c : stripped_text) {
+    if (c >= '0' && c <= '9') {
+      digits.push_back(c);
+      is_digit_run = true;
+      continue;
+    }
+    if (is_digit_run) break;
+  }
+  if (digits.empty()) return std::nullopt;
+  int32_t value = 0;
+  if (!absl::SimpleAtoi(digits, &value)) {
+    return std::nullopt;
+  }
+  return value;
+}
+
 }  // namespace sudoku

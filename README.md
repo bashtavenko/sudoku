@@ -12,7 +12,7 @@ the solver outputs
 ## Installation on Ubuntu
 
 1. Install Bazel or better Bazelisk
-2. Train a model based on MNIST. See [download_mnist](training/download_mnist.py) and run  [training](training/train_main.cc).
+2. Install OpenCV and Tesseract with included scripts
 3. Run ```bazel run //:solver_main -- --image_path=$HOME/sudoku/testdata/sudoku_9_9.png --model_path=$HOME/sudoku/model.yml``` 
 
 ## Overview
@@ -23,7 +23,8 @@ the solver outputs
 4. Puts answers into the same grid
 
 ## Dependencies
-* OpenCV, built from source
+* OpenCV
+* Tesseract
 * Abseil
 * Glog, Gtest and a few other dev dependencies
 

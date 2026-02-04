@@ -4,10 +4,11 @@
 #include "absl/types/optional.h"
 #include "opencv2/core.hpp"
 #include "opencv2/ml.hpp"
+#include "tesseract_helpers.h"
 
 namespace sudoku {
 
-// Detects Sudoku digits
+// Detects Sudoku digits with ML model
 class DigitDetector {
  public:
   // Loads saved model. In any errors crashes binary with CHECK.
@@ -28,6 +29,19 @@ class DigitDetector {
 
  private:
   cv::Ptr<cv::ml::StatModel> model_;
+};
+
+class DigitDetectorTesseract {
+ public:
+  static DigitDetectorTesseract Create();
+  // Detects a digit from the given cv::Mat.
+  // Returns `std::nullopt` if the digit is undetected.
+  // Blank text returns 0;
+  absl::optional<int32_t> Detect(const cv::Mat& image) const;
+
+ private:
+  DigitDetectorTesseract(Tesseract tesseract);
+  Tesseract tesseract_;
 };
 
 }  // namespace sudoku

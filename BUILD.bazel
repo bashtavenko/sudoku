@@ -106,6 +106,7 @@ cc_library(
     srcs = ["digit_detector.cc"],
     hdrs = ["digit_detector.h"],
     deps = [
+        ":tesseract_helpers",
         "//:opencv",
         "@absl//absl/strings",
         "@absl//absl/types:optional",
@@ -123,6 +124,7 @@ cc_test(
     deps = [
         ":cell_detection",
         ":digit_detector",
+        ":tesseract_helpers",
         "//:opencv",
         "@bazel_tools//tools/cpp/runfiles",
         "@googletest//:gtest_main",
@@ -146,5 +148,57 @@ cc_binary(
         "@absl//absl/flags:parse",
         "@gflags",
         "@glog",
+    ],
+)
+
+# Since Tesseract was installed through package sources and not from the source,
+# globing .so would not work similar to OpenCV where all OpenCV .so's are in the lib.
+# Thus it needs linkopts to pull correct Tesseract .so
+cc_library(
+    name = "tesseract",
+    srcs = [],
+    hdrs = glob(
+        [
+            "third_party/tesseract/include_tesseract/**",
+            "third_party/tesseract/include_leptonica/**",
+        ],
+        allow_empty = True,
+    ),
+    includes = [
+        "third_party/tesseract/include_leptonica",
+        "third_party/tesseract/include_tesseract",
+    ],
+    linkopts = [
+        "-Lthird_party/tesseract/lib",
+        "-ltesseract",
+        "-llept",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "hello_tesseract_test",
+    srcs = ["hello_tesseract_test.cc"],
+    data = ["//testdata"],
+    deps = [
+        ":tesseract",
+        ":tesseract_helpers",
+        "//:opencv",
+        "@absl//absl/status:status_matchers",
+        "@absl//absl/status:statusor",
+        "@absl//absl/strings",
+        "@bazel_tools//tools/cpp/runfiles",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "tesseract_helpers",
+    srcs = ["tesseract_helpers.cc"],
+    hdrs = ["tesseract_helpers.h"],
+    deps = [
+        ":opencv",
+        ":tesseract",
+        "@absl//absl/status:statusor",
     ],
 )
